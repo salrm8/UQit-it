@@ -36,16 +36,14 @@ class entropy:
            kde__ = kde_(self.x.T)
            H = -np.mean(np.log(kde__))
 
-
         if self.method in ['simpson','romberg']:
            for key, value in kwargs.items(): 
                if key == 'nInteg':
                   self.nInteg = value 
 
            raise ValueError('Not Implemented')       
-
            H=10000       
-        
+
         return H
 
     def kl(self,k=3):
