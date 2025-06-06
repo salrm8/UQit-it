@@ -17,40 +17,45 @@ class mi:
     Args:
        `x`: 1d numpy array of size n
        `y`: 1d numpy array of size n
+       `lag`: positive int, lag between the time series; lag==0: for random variables
 
     Return:
        `Ixy`: mutual information between x and y
     """
-    def __init__(self,x,y):
+    def __init__(self,x,y,lag=0):
         """
 
         """
         self.x = x
         self.y = y
+        self.lag = lag
+
+        if self.lag>0:
+           self.x = self.x[:-self.lag] 
+           self.y = self.y[self.lag:] 
 
     def kde(self,method='mc'):
         """
         MI based on entropies estimated by the KDE method
         """
-        Hx = entropy(self.x).kde()
-        Hy = entropy(self.y).kde()
-        Hxy = entropy(np.vstack((self.x,self.y)).T).kde()
+        self.method = method
+        Hx = entropy(self.x).kde(method = self.method)
+        Hy = entropy(self.y).kde(method = self.method)
+        Hxy = entropy(np.vstack((self.x,self.y)).T).kde(method = self.method)
         Ixy = Hx + Hy - Hxy
         return Ixy
 
-    def kl(self,k=3):
+    def kl(self,k=3):        
         """
         MI based on entropies estimated by the KL (Kozachenko-Leonenko) method
 
         Args:
-          `k`: int, k-th nearest points to x[i]
+        `k`: int, k-th nearest points to each sample
         """
-        x = self.x
-        y = self.y
-        if x.ndim == 1:
-           x = x[:,None]
-        if y.ndim == 1:
-           y = y[:,None]
+        if self.x.ndim == 1:
+           x = self.x[:,None]
+        if self.y.ndim == 1:
+           y = self.y[:,None]
 
         n = x.shape[0]
 
@@ -79,4 +84,3 @@ class mi:
         # compute mutual information based on KL method
         Ixy = digamma(k) + digamma(n) - np.mean(digamma(nx + 1) + digamma(ny + 1)) #-1./k
         return Ixy
-
