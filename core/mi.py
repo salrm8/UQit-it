@@ -45,12 +45,16 @@ class mi:
         Ixy = Hx + Hy - Hxy
         return Ixy
 
-    def kl(self,k=3):        
+    def ksg(self,k=3):        
         """
-        MI based on entropies estimated by the KL (Kozachenko-Leonenko) method
+        MI based on entropies estimated by the KL (Kozachenko-Leonenko) method following the KSG approach. 
+        This method relies on the KNN method. 
+
+        Reference: 
+        A. Kraskov, H. Stogbauer, P. Grassberger (KSG), Phys. Rev. E 69, 066138, 2011. 
 
         Args:
-        `k`: int, k-th nearest points to each sample
+           `k`: int, k-th nearest points to each sample
         """
         if self.x.ndim == 1:
            x = self.x[:,None]
