@@ -22,6 +22,7 @@ class entropy:
 
         Args:
           `x`: 2d numpy array of shape(n,dim), n: number of samples, dim: number of variates
+          `method`: string, integration method: default 'mc' (Monte Carlo)
 
         Return:
           `H`: float, Shannon entropy estimated by the KL method
@@ -52,7 +53,7 @@ class entropy:
 
         Args:
           `x`: 2d numpy array of shape(n,dim), n: number of samples, dim: number of variates
-          `k`: int, k-th nearest points to x[i,:]
+          `k`: int, k-th nearest points to each sample
 
         Return:
           `H`: float, Shannon entropy estimated by the KL method
