@@ -12,7 +12,6 @@ from entropy import entropy
 class mi:
     """
     Mutual information between two time series x and y
-    I(X,Y) = H(X) + H(Y) - H(X,Y)
 
     Args:
        `x`: 1d numpy array of size n
@@ -37,6 +36,7 @@ class mi:
     def kde(self,method='mc'):
         """
         MI based on entropies estimated by the KDE method
+        I(X,Y) = H(X) + H(Y) - H(X,Y)
         """
         self.method = method
         Hx = entropy(self.x).kde(method = self.method)
@@ -88,3 +88,58 @@ class mi:
         # compute mutual information based on KL method
         Ixy = digamma(k) + digamma(n) - np.mean(digamma(nx + 1) + digamma(ny + 1)) #-1./k
         return Ixy
+
+class mi_multiLag:
+    """
+    Estimate MI between x(t) and y(t) at a set of given lags
+
+    Returns:
+       `miList`: 1d numpy array, array of MI values associated with the lagList
+       `maxMI`: float, maximum MI among the considered lagList
+       `maxMIlag`: int, the lag at which max MI is computed
+    """
+    def __init__(self,x,y,lagList):
+        """
+        Args:
+          `x`: 1d numpy array of size n
+          `y`: 1d numpy array of size n
+          `lagList`: List of positive int, list of lags between the time series; 
+        """  
+        self.x = x
+        self.y = y
+        self.lagList = lagList
+
+    def kde(self,method='mc'):
+        """
+        MI based on entropies estimated by the KDE method at lags in lagList
+        I(X,Y) = H(X) + H(Y) - H(X,Y)
+        """
+        self.method = method
+        miList = []
+        maxMI = -100.0
+
+        for lag_ in self.lagList: 
+            mi_ = mi(self.x, self.y,lag=lag_).kde(method=self.method)
+            if mi_ > maxMI: 
+               maxMI = mi_
+               maxMIlag = lag_
+            miList.append(mi_)
+        return np.asarray(miList), maxMI, maxMIlag
+
+    def ksg(self,k=3):
+        """
+        MI based on entropies estimated by the KL (Kozachenko-Leonenko) method following the KSG approach.
+        This method relies on the KNN method.
+        """
+        self.k = k
+        miList = []
+        maxMI = -100.0
+
+        for lag_ in self.lagList: 
+            mi_ = mi(self.x, self.y,lag=lag_).ksg(k=self.k)
+            if mi_ > maxMI: 
+               maxMI = mi_
+               maxMIlag = lag_
+            miList.append(mi_)
+        return np.asarray(miList), maxMI, maxMIlag
+
