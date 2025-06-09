@@ -75,7 +75,8 @@ class bi_te:
         #Create delayed-embedded
         xPast = np.array([self.x[i-self.lag: i] for i in range(self.lag,self.n-1)])  
         yPast = np.array([self.y[i-self.lag: i] for i in range(self.lag,self.n-1)])  
-        yFutu = self.y[self.lag+1:]  
+#        yFutu = self.y[self.lag+1:]  
+        yFutu = self.y[self.lag:self.n-1]  
 
         #Create joint samples
         XZ = np.hstack((yFutu[:,None], yPast))   
@@ -115,5 +116,6 @@ class bi_te:
         nXZ = np.array([float(len(i) - 1) for i in nXZ])
 
         te = digamma(k) + np.mean(digamma(nZ + 1) - digamma(nXZ + 1) - digamma(nYZ + 1))
+        #te = digamma(k) + np.mean(digamma(nZ) - digamma(nXZ) - digamma(nYZ))
         #te = digamma(k) - 2./k + np.mean(digamma(nZ) - digamma(nXZ) - digamma(nYZ) - 1./nXZ - 1./nYZ)
         return te
