@@ -15,19 +15,19 @@ class bi_te:
     Estimate Transfer Entropy (TE) for a pair of time series
     """
 
-    def __init__(self,x,y,lag):
+    def __init__(self,x,y,embDim):
         """
         Args: 
            `x`: 1d numpy array of size n, containing samples of source time series
            `y`: 1d numpy array of size n, containing samples of target time series
-           `lag`: int (>0), lag when computing TE
+           `embDim`: int (>0), embedded dimension (number of delayed samples0
 
         Return:
-            `te`: float, transfer entropy (x->y) at embedded delay `lag`
+            `te`: float, transfer entropy (x->y) for embedded dimension `embDim`
         """
         self.x = x
         self.y = y
-        self.lag = lag
+        self.embDim = embDim
 
         self.n = self.x.shape[0]
         assert self.y.shape[0] == self.n
@@ -43,9 +43,9 @@ class bi_te:
         """
         self.kdeMethod = method
 
-        xPast = self.x[:-self.lag]
-        yPast = self.y[:-self.lag]
-        yFutu = self.y[self.lag:]
+        xPast = self.x[:-self.embDim]
+        yPast = self.y[:-self.embDim]
+        yFutu = self.y[self.embDim:]
 
         H_yPast = entropy(yPast).kde(method=self.kdeMethod,**kwargs)
         H_yFutu_yPast = entropy(np.vstack((yFutu,yPast)).T).kde(method=self.kdeMethod,**kwargs)
@@ -55,7 +55,7 @@ class bi_te:
         te = H_yFutu_yPast - H_yPast - H_yFutu_yPast_xPast + H_yPast_xPast
         return te
 
-    def ksg(self,k=3,tol=1e-10):    
+    def ksg(self,k=3,tol=1e-8):    
         """
         Estimate transfer entropy using the KSG-based method (KNN type). 
 
@@ -72,11 +72,10 @@ class bi_te:
         self.k = k
         self.tol = tol
 
-        #Create delayed-embedded
-        xPast = np.array([self.x[i-self.lag: i] for i in range(self.lag,self.n-1)])  
-        yPast = np.array([self.y[i-self.lag: i] for i in range(self.lag,self.n-1)])  
-#        yFutu = self.y[self.lag+1:]  
-        yFutu = self.y[self.lag:self.n-1]  
+        #Create delayed time series
+        xPast = np.array([self.x[i-self.embDim: i][::-1] for i in range(self.embDim,self.n)])  
+        yPast = np.array([self.y[i-self.embDim: i][::-1] for i in range(self.embDim,self.n)])  
+        yFutu = self.y[self.embDim:self.n]  
 
         #Create joint samples
         XZ = np.hstack((yFutu[:,None], yPast))   
@@ -84,17 +83,11 @@ class bi_te:
         XYZ = np.hstack((yFutu[:,None], xPast, yPast))
 
         # Create kd trees
-        #tree_XZ = cKDTree(XZ)
-        #tree_YZ = cKDTree(YZ)
         tree_XYZ = cKDTree(XYZ)
 
         # find distance of each point from its k-th neighbours in the joint set
-        #r_XZ, _ = tree_XZ.query(XZ, k + 1, p=np.inf)
-        #r_YZ, _ = tree_YZ.query(YZ, k + 1, p=np.inf)
         r_Z, _ = tree_XYZ.query(XYZ, k + 1, p=np.inf)
 
-        #eps_YZ = r_YZ[:, -1]
-        #eps_XZ = r_XZ[:, -1]
         eps_Z = r_Z[:, -1]  - self.tol
 
         #Count neighbors in marginal spaces (X-space and Y-space)
@@ -104,11 +97,11 @@ class bi_te:
 
         # collect the index of points falling within the ball of radius epsilon around each point
         nYZ = np.array([knn_YZ.radius_neighbors([YZ[i]], eps_Z[i], 
-                        return_distance=False)[0] for i in range(self.n-self.lag-1)], dtype=object)
+                        return_distance=False)[0] for i in range(self.n-self.embDim)], dtype=object)
         nXZ = np.array([knn_XZ.radius_neighbors([XZ[i]], eps_Z[i], 
-                        return_distance=False)[0] for i in range(self.n-self.lag-1)], dtype=object)
+                        return_distance=False)[0] for i in range(self.n-self.embDim)], dtype=object)
         nZ = np.array([knn_Z.radius_neighbors([yPast[i]], eps_Z[i], 
-                        return_distance=False)[0] for i in range(self.n-self.lag-1)], dtype=object)
+                        return_distance=False)[0] for i in range(self.n-self.embDim)], dtype=object)
 
         # count the number of points in the vicinity of each point, excluding itself
         nZ = np.array([float(len(i) - 1) for i in nZ])
