@@ -6,6 +6,9 @@ import numpy as np
 import scipy.stats as scst
 from scipy.spatial import cKDTree
 from scipy.special import gamma, digamma
+import sys
+sys.path.append('./')
+import statsTools
 #
 class entropy:
     """
@@ -15,6 +18,21 @@ class entropy:
     def __init__(self,x,verbose=False):
         self.x = x
         self.verbose = verbose
+
+    def binning(self,nbin=10,tol=1e-14):
+        """
+        Binning method for estimating entropy of x
+
+        Args:
+           `nbin`: int, number of bins
+           `iplot`: bool, whether or not plot the histogram
+        """
+        self.nbin = nbin
+        self.tol = tol
+        p, binEdge = statsTools.hist(self.x,self.nbin,self.verbose)
+        H = -np.sum(p*np.log(p + self.tol))
+  
+        return H
     
     def kde(self,method='mc',**kwargs):
         """
