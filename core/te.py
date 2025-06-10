@@ -77,7 +77,7 @@ class bi_te:
         yPast = np.array([self.y[i-self.embDim: i][::-1] for i in range(self.embDim,self.n)])  
         yFutu = self.y[self.embDim:self.n]  
 
-        #Create joint samples
+        #Create joint embeddings
         XZ = np.hstack((yFutu[:,None], yPast))   
         YZ = np.hstack((xPast, yPast))   
         XYZ = np.hstack((yFutu[:,None], xPast, yPast))
@@ -112,3 +112,106 @@ class bi_te:
         #te = digamma(k) + np.mean(digamma(nZ) - digamma(nXZ) - digamma(nYZ))
         #te = digamma(k) - 2./k + np.mean(digamma(nZ) - digamma(nXZ) - digamma(nYZ) - 1./nXZ - 1./nYZ)
         return te
+
+
+class mv_te:    
+    """
+    Esimate Transfer Entropy for multivariate time series
+    """
+    def __init__(self,X,y,embDim):
+       """
+       Args:
+          `X`: List, list of 1d arrays of source time series, X=[x1,x2,...,xp] where xi has size n
+          `y`: 1d numpy array, target time series
+          `embDim`: int (>0), embedded dimension (number of delayed samples0
+       """
+       self.X = X
+       self.y = y
+       self.embDim = embDim
+
+       self.child = None
+
+    def _create_child(self,X,y,embDim):
+        self.child = mv_te(X,y,embDim)        
+
+    def multiSrc_ksg(self,k=3,tol=1e-8):
+        """
+        Estimate transfer entropy from multi-source X to single target y
+        Args:
+           `k`: int, k-th nearest points to each sample
+           `tol`: float, tolerance (small value)
+
+        Return:
+          `te`: float, transfer entropy (X->y) at embedded dimension `embDim`
+        """
+        self.k = k
+        self.tol = tol
+        lag = self.embDim
+
+        self.n = self.y.shape[0]
+        assert all(x.shape[0] == self.n for x in self.X) 
+
+        # Create delayed time series
+        yPast = np.array([self.y[i-lag:i][::-1] for i in range(lag, self.n)])    
+        XPast = [np.array([x[i-lag:i][::-1] for i in range(lag, self.n)]) for x in self.X]
+        yFutu = self.y[lag:self.n]
+
+        # Create joint embeddings
+        XY_past = np.hstack(XPast + [yPast])
+        YZ = np.hstack((yFutu[:, None], yPast))
+        XYZ = np.hstack((yFutu[:, None], XY_past))
+
+        # Build k-d trees for radius queries
+        tree_XYZ = cKDTree(XYZ)
+        r_XYZ, _ = tree_XYZ.query(XYZ, k + 1, p=np.inf)
+        eps_Z = r_XYZ[:, -1] - self.tol
+
+        knn_XY = NearestNeighbors(n_neighbors=k+1, p=np.inf,metric='chebyshev').fit(XY_past)
+        knn_YZ = NearestNeighbors(n_neighbors=k+1, p=np.inf,metric='chebyshev').fit(YZ)
+        knn_Y = NearestNeighbors(n_neighbors=k+1, p=np.inf,metric='chebyshev').fit(yPast)
+
+        # Radius neighbor counts
+        nXY = np.array([len(knn_XY.radius_neighbors([XY_past[i]], eps_Z[i], 
+              return_distance=False)[0]) - 1 for i in range(self.n - lag)])
+        nYZ = np.array([len(knn_YZ.radius_neighbors([YZ[i]], eps_Z[i], 
+              return_distance=False)[0]) - 1 for i in range(self.n - lag)])
+        nY = np.array([len(knn_Y.radius_neighbors([yPast[i]], eps_Z[i], 
+              return_distance=False)[0]) - 1 for i in range(self.n - lag)])
+
+        # KSG estimator
+        te = digamma(k) + np.mean(digamma(nY + 1) - digamma(nXY + 1) - digamma(nYZ + 1))
+        return te 
+
+    def ntwrk_ksg(self,k=3,tol=1e-8):
+        """
+        Estimate all TEs from each source to the target consideing the multi sources and 
+        single target being in a network.
+        
+        Return:
+          `teDict`: dict, Net transfer entropy from each source within the mult-souces X to single 
+                          target y at embedded dimension `embDim`
+        """
+        self.p = len(self.X)    #number of source variates
+        self.k = k
+        self.tol = tol
+
+        #TE from all sources to the target
+        self._create_child(X=self.X, y=self.y, embDim=self.embDim)
+        te_all = self.child.multiSrc_ksg(k=self.k,tol=self.tol)
+        teDict={'TE_all->y':te_all}
+
+        for i in range(self.p):
+
+            #TE from all sources except the i-th one
+            X_=[]
+            for j in range(self.p):
+                if j != i:
+                   X_.append(self.X[j])   
+
+            self._create_child(X=X_, y=self.y, embDim=self.embDim)
+            te_ = self.child.multiSrc_ksg(k=self.k,tol=self.tol)
+
+            #Net TE from i-th source to target y
+            teDict.update({'TE'+str(i)+'->y':te_all - te_})
+
+        return teDict
