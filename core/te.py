@@ -132,7 +132,7 @@ class mv_te:
        self.child = None
 
     def _create_child(self,X,y,embDim):
-        self.child = mv_te(X,y,embDim)        
+        self.child = mv_te(X,y,embDim)    
 
     def multiSrc_ksg(self,k=3,tol=1e-8):
         """
@@ -166,17 +166,41 @@ class mv_te:
         r_XYZ, _ = tree_XYZ.query(XYZ, k + 1, p=np.inf)
         eps_Z = r_XYZ[:, -1] - self.tol
 
-        knn_XY = NearestNeighbors(n_neighbors=k+1, p=np.inf,metric='chebyshev').fit(XY_past)
-        knn_YZ = NearestNeighbors(n_neighbors=k+1, p=np.inf,metric='chebyshev').fit(YZ)
-        knn_Y = NearestNeighbors(n_neighbors=k+1, p=np.inf,metric='chebyshev').fit(yPast)
+        # Radius neighbour counts
+        # NOTE: The comment-out code below uses NearestNeighbors,
+        # which is slower than cKDTree for radius queries.
 
-        # Radius neighbor counts
-        nXY = np.array([len(knn_XY.radius_neighbors([XY_past[i]], eps_Z[i], 
-              return_distance=False)[0]) - 1 for i in range(self.n - lag)])
-        nYZ = np.array([len(knn_YZ.radius_neighbors([YZ[i]], eps_Z[i], 
-              return_distance=False)[0]) - 1 for i in range(self.n - lag)])
-        nY = np.array([len(knn_Y.radius_neighbors([yPast[i]], eps_Z[i], 
-              return_distance=False)[0]) - 1 for i in range(self.n - lag)])
+        # knn_XY = NearestNeighbors(n_neighbors=k+1, p=np.inf,metric='chebyshev').fit(XY_past)
+        # knn_YZ = NearestNeighbors(n_neighbors=k+1, p=np.inf,metric='chebyshev').fit(YZ)
+        # knn_Y = NearestNeighbors(n_neighbors=k+1, p=np.inf,metric='chebyshev').fit(yPast)
+        
+        # nXY = np.array([len(knn_XY.radius_neighbors([XY_past[i]], eps_Z[i], 
+        #       return_distance=False)[0]) - 1 for i in range(self.n - lag)])
+        # nYZ = np.array([len(knn_YZ.radius_neighbors([YZ[i]], eps_Z[i], 
+        #       return_distance=False)[0]) - 1 for i in range(self.n - lag)])
+        # nY = np.array([len(knn_Y.radius_neighbors([yPast[i]], eps_Z[i], 
+        #       return_distance=False)[0]) - 1 for i in range(self.n - lag)])
+
+        # Create kd-trees for neighbour queries
+        # NOTE: Using cKDTree for radius queries seems to be more efficient than NearestNeighbors.
+        # cKDTree and KDTree are identical as of scipy 1.6, but @salrm8 you used cKDTree so I
+        # just stuck with it
+        
+        # Create kd-trees for radius queries
+        tree_XY = cKDTree(XY_past)
+        tree_YZ = cKDTree(YZ)
+        tree_Y = cKDTree(yPast)
+    
+        # This returns a list of lists of neighbor indices
+        neighbors_XY = tree_XY.query_ball_point(XY_past, eps_Z, p=np.inf)
+        neighbors_YZ = tree_YZ.query_ball_point(YZ, eps_Z, p=np.inf)
+        neighbors_Y = tree_Y.query_ball_point(yPast, eps_Z, p=np.inf)
+
+        # Get the count of neighbors for each point
+        nXY = np.array([len(indices) for indices in neighbors_XY]) - 1
+        nYZ = np.array([len(indices) for indices in neighbors_YZ]) - 1
+        nY = np.array([len(indices) for indices in neighbors_Y]) - 1
+
 
         # KSG estimator
         te = digamma(k) + np.mean(digamma(nY + 1) - digamma(nXY + 1) - digamma(nYZ + 1))
