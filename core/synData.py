@@ -69,4 +69,18 @@ def varSampGen(n,order=1):
            x[i,:] = A0 + A1@x[i-1,:] + A2@x[i-2,:] + A3@x[i-3,:] + eps[i,:]
     return x[n:,:],A,covMat_eps
 
-
+def tsGen3(n=10000):
+    """
+    VAR(2) for 4 variates x1[t], x2[t], x3[t], x4[t]
+    """
+    np.random.seed(200)
+    x=np.zeros((2*n,4))
+    Veps = np.eye(4)
+    e = np.random.multivariate_normal(np.zeros(4), cov=Veps,size=2*n)
+    
+    for i in range(2,2*n):
+        x[i,0] = 0.8*x[i-1,0] + e[i,0]
+        x[i,1] = 0.8*x[i-1,1] + 0.5*x[i-2,0] + e[i,1]
+        x[i,2] = 0.7*x[i-1,0] + e[i,2]
+        x[i,3] = 0.7*x[i-2,0] + e[i,3]
+    return x[n:,:]  
