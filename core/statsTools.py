@@ -2,6 +2,7 @@
 # General statistical tools
 #######################################################################
 import numpy as np
+import matplotlib.pyplot as plt
 #
 def hist(x,nbin=10,plot=False):
     """
