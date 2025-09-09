@@ -80,6 +80,8 @@ class entropy:
         n = self.x.shape[0]
         if self.x.ndim == 1:
            x = self.x[:,None]
+        else: 
+           x = self.x 
         dim = x.shape[1]
 
         #find the distance of x[i] from points within the k-th neighbour
